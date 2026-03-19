@@ -5,6 +5,7 @@ from flask import Blueprint, request
 from app.models.complaint import Complaint
 from app.repositories.complaint_repository import complaint_repo, log_repo
 from app.repositories.user_repository import ADMIN, CITIZEN, MAYOR, OFFICER, user_repo
+from app.repositories.department_repository import department_repo
 from app.services.analytics import build_analytics
 from app.services.auth_service import parse_bearer_token, sessions
 from app.services.classifier import classifier
@@ -293,20 +294,19 @@ def admin_dashboard():
         return error
 
     complaints = complaint_repo.list_all()
-    by_officer: dict[str, int] = {}
-    by_department: dict[str, int] = {}
-    by_citizen: dict[str, dict[str, int | str]] = {}
-
+    all_officers = user_repo.list_by_role(OFFICER) + user_repo.list_by_role(MAYOR)
+    all_departments = department_repo.list_all()
+    all_citizens = user_repo.list_by_role(CITIZEN)
+    
+    # Count complaints by officer and department
+    complaint_by_officer: dict[str, int] = {}
+    complaint_by_department: dict[str, int] = {}
+    complaint_by_citizen: dict[str, int] = {}
+    
     for item in complaints:
-        by_officer[item.assigned_officer] = by_officer.get(item.assigned_officer, 0) + 1
-        by_department[item.department] = by_department.get(item.department, 0) + 1
-        if item.mobile not in by_citizen:
-            by_citizen[item.mobile] = {
-                "citizen_name": item.citizen_name,
-                "mobile": item.mobile,
-                "complaints": 0,
-            }
-        by_citizen[item.mobile]["complaints"] += 1
+        complaint_by_officer[item.assigned_officer] = complaint_by_officer.get(item.assigned_officer, 0) + 1
+        complaint_by_department[item.department] = complaint_by_department.get(item.department, 0) + 1
+        complaint_by_citizen[item.mobile] = complaint_by_citizen.get(item.mobile, 0) + 1
 
     return {
         "user": user.to_public_dict(),
@@ -314,21 +314,39 @@ def admin_dashboard():
             "total_complaints": len(complaints),
             "total_open": sum(1 for item in complaints if item.status != STATUS_RESOLVED),
             "total_resolved": sum(1 for item in complaints if item.status == STATUS_RESOLVED),
-            "active_officers": len(by_officer),
-            "total_departments": len(by_department),
-            "registered_citizens": len(by_citizen),
+            "active_officers": len(all_officers),
+            "total_departments": len(all_departments),
+            "registered_citizens": len(all_citizens),
         },
         "officer_manager": [
-            {"officer": officer, "assigned_complaints": count}
-            for officer, count in sorted(by_officer.items(), key=lambda item: item[1], reverse=True)
+            {
+                "username": officer.username,
+                "display_name": officer.display_name,
+                "ward": officer.ward,
+                "role": officer.role,
+                "assigned_complaints": complaint_by_officer.get(officer.username, 0),
+                "departments": officer.departments,
+            }
+            for officer in sorted(all_officers, key=lambda o: complaint_by_officer.get(o.username, 0), reverse=True)
         ],
         "department_manager": [
-            {"department": department, "complaints": count}
-            for department, count in sorted(by_department.items(), key=lambda item: item[1], reverse=True)
+            {
+                "id": dept.id,
+                "name": dept.name,
+                "description": dept.description,
+                "complaints": complaint_by_department.get(dept.name, 0),
+            }
+            for dept in sorted(all_departments, key=lambda d: complaint_by_department.get(d.name, 0), reverse=True)
         ],
-        "citizen_manager": sorted(
-            by_citizen.values(), key=lambda item: item["complaints"], reverse=True
-        ),
+        "citizen_manager": [
+            {
+                "username": citizen.username,
+                "citizen_name": citizen.display_name,
+                "mobile": citizen.mobile,
+                "complaints": complaint_by_citizen.get(citizen.mobile, 0),
+            }
+            for citizen in sorted(all_citizens, key=lambda c: complaint_by_citizen.get(c.mobile, 0), reverse=True)
+        ],
     }
 
 
@@ -359,3 +377,205 @@ def channels_meta():
         "active_channels": ["web", "mobile"],
         "planned_channels": ["sms", "voice_ivr"],
     }
+
+
+# Admin Management Endpoints
+
+@api_bp.get("/admin/officers")
+def list_officers():
+    _, _, error = _require_auth([ADMIN])
+    if error:
+        return error
+
+    officers = user_repo.list_by_role(OFFICER)
+    mayors = user_repo.list_by_role(MAYOR)
+    all_users = officers + mayors
+
+    return {
+        "officers": [
+            {
+                "username": u.username,
+                "display_name": u.display_name,
+                "ward": u.ward,
+                "role": u.role,
+                "departments": u.departments,
+            }
+            for u in all_users
+        ]
+    }
+
+
+@api_bp.post("/admin/officers")
+def create_officer():
+    _, _, error = _require_auth([ADMIN])
+    if error:
+        return error
+
+    payload = request.get_json(silent=True) or {}
+    username = str(payload.get("username", "")).strip().lower()
+    password = str(payload.get("password", "")).strip()
+    display_name = str(payload.get("display_name", "")).strip()
+    ward = str(payload.get("ward", "")).strip()
+    departments = payload.get("departments", [])
+
+    if not username or not password or not display_name or not ward:
+        return {"error": "username, password, display_name and ward are required"}, 400
+
+    try:
+        new_officer = user_repo.create_officer(
+            username=username,
+            password=password,
+            display_name=display_name,
+            ward=ward,
+            departments=departments,
+        )
+        return {
+            "username": new_officer.username,
+            "display_name": new_officer.display_name,
+            "ward": new_officer.ward,
+            "departments": new_officer.departments,
+        }, 201
+    except ValueError as exc:
+        return {"error": str(exc)}, 409
+
+
+@api_bp.put("/admin/officers/<username>")
+def update_officer(username: str):
+    _, _, error = _require_auth([ADMIN])
+    if error:
+        return error
+
+    payload = request.get_json(silent=True) or {}
+    display_name = payload.get("display_name", "")
+    ward = payload.get("ward", "")
+    departments = payload.get("departments", [])
+
+    updated_user = user_repo.update_officer(
+        username=username.lower(),
+        display_name=display_name,
+        ward=ward,
+        departments=departments,
+    )
+
+    if updated_user is None:
+        return {"error": "officer not found"}, 404
+
+    return {
+        "username": updated_user.username,
+        "display_name": updated_user.display_name,
+        "ward": updated_user.ward,
+        "departments": updated_user.departments,
+    }
+
+
+@api_bp.delete("/admin/officers/<username>")
+def delete_officer(username: str):
+    _, _, error = _require_auth([ADMIN])
+    if error:
+        return error
+
+    if user_repo.delete_user(username.lower()):
+        return {"status": "deleted"}
+    return {"error": "officer not found"}, 404
+
+
+@api_bp.get("/admin/departments")
+def list_departments():
+    _, _, error = _require_auth([ADMIN])
+    if error:
+        return error
+
+    departments = department_repo.list_all()
+    return {
+        "departments": [d.to_dict() for d in departments]
+    }
+
+
+@api_bp.post("/admin/departments")
+def create_department():
+    _, _, error = _require_auth([ADMIN])
+    if error:
+        return error
+
+    payload = request.get_json(silent=True) or {}
+    name = str(payload.get("name", "")).strip()
+    description = str(payload.get("description", "")).strip()
+
+    if not name:
+        return {"error": "name is required"}, 400
+
+    try:
+        new_dept = department_repo.create(name, description)
+        return new_dept.to_dict(), 201
+    except ValueError as exc:
+        return {"error": str(exc)}, 409
+
+
+@api_bp.put("/admin/departments/<name>")
+def update_department(name: str):
+    _, _, error = _require_auth([ADMIN])
+    if error:
+        return error
+
+    payload = request.get_json(silent=True) or {}
+    description = payload.get("description", "")
+
+    updated = department_repo.update(name, description)
+    if updated is None:
+        return {"error": "department not found"}, 404
+
+    return updated.to_dict()
+
+
+@api_bp.delete("/admin/departments/<name>")
+def delete_department(name: str):
+    _, _, error = _require_auth([ADMIN])
+    if error:
+        return error
+
+    if department_repo.delete(name):
+        return {"status": "deleted"}
+    return {"error": "department not found"}, 404
+
+
+@api_bp.get("/admin/citizens")
+def list_citizens():
+    _, _, error = _require_auth([ADMIN])
+    if error:
+        return error
+
+    complaints = complaint_repo.list_all()
+    citizens_map: dict[str, dict] = {}
+
+    for complaint in complaints:
+        if complaint.mobile not in citizens_map:
+            citizens_map[complaint.mobile] = {
+                "mobile": complaint.mobile,
+                "citizen_name": complaint.citizen_name,
+                "complaints": 0,
+            }
+        citizens_map[complaint.mobile]["complaints"] += 1
+
+    return {
+        "citizens": sorted(
+            citizens_map.values(),
+            key=lambda x: x["complaints"],
+            reverse=True
+        )
+    }
+
+
+@api_bp.delete("/admin/citizens/<mobile>")
+def delete_citizen(mobile: str):
+    _, _, error = _require_auth([ADMIN])
+    if error:
+        return error
+
+    complaints = complaint_repo.list_by_mobile(mobile)
+    if not complaints:
+        return {"error": "citizen not found"}, 404
+
+    for complaint in complaints:
+        complaint_repo.delete(complaint.ticket_id)
+
+    return {"status": "deleted", "complaints_removed": len(complaints)}

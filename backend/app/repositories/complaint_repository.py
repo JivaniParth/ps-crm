@@ -36,6 +36,13 @@ class InMemoryComplaintRepository:
             complaint.status = status
             return complaint
 
+    def delete(self, ticket_id: str) -> bool:
+        with self._lock:
+            if ticket_id in self._store:
+                del self._store[ticket_id]
+                return True
+            return False
+
 
 class InMemoryLogRepository:
     def __init__(self) -> None:

@@ -209,6 +209,7 @@ function App() {
       "Every Citizen's Voice, from submission to automated routing and transparent resolution.",
     []
   );
+  const role = auth.user?.role || "";
 
   if (!authReady) {
     return (
@@ -240,53 +241,69 @@ function App() {
       </header>
 
       {isAuthenticated ? (
-        <main className="layout-grid">
-          <div className="stack">
-            {auth.user.role === "citizen" && <NLPDemo onPrediction={setPrediction} />}
-            {auth.user.role === "citizen" && (
-              <ComplaintForm
-                predictedDepartment={prediction.department}
-                authToken={auth.token}
-                onSubmitted={(submission) => {
-                  setTicket(submission);
-                  setTimelineIndex(0);
-                }}
-              />
-            )}
-            {auth.user.role === "officer" && (
-              <section className="card">
-                <h3>Officer Console</h3>
-                <p>Use the queue controls to move complaints through their lifecycle.</p>
-              </section>
-            )}
-          </div>
+        role === "admin" ? (
+          <main className="layout-grid layout-single">
+            <RoleDashboard
+              role={role}
+              data={dashboardData}
+              onStatusUpdate={updateTicketStatus}
+              authToken={auth.token}
+            />
+          </main>
+        ) : role === "mayor" ? (
+          <main className="layout-grid layout-single">
+            <MayorDashboard data={dashboardData} statusData={statusData} departmentData={departmentData} />
+          </main>
+        ) : (
+          <main className="layout-grid">
+            <div className="stack">
+              {role === "citizen" && <NLPDemo onPrediction={setPrediction} />}
+              {role === "citizen" && (
+                <ComplaintForm
+                  predictedDepartment={prediction.department}
+                  authToken={auth.token}
+                  onSubmitted={(submission) => {
+                    setTicket(submission);
+                    setTimelineIndex(0);
+                  }}
+                />
+              )}
+              {role === "officer" && (
+                <section className="card">
+                  <h3>Officer Console</h3>
+                  <p>Use the queue controls to move complaints through their lifecycle.</p>
+                </section>
+              )}
+            </div>
 
-          <div className="stack">
-            <ResolutionTimeline currentStep={timelineIndex} />
-            {ticket && (
-              <section className="card">
-                <h3>Live Ticket Snapshot</h3>
-                <p>
-                  <strong>Ticket ID:</strong> {ticket.ticket_id}
-                </p>
-                <p>
-                  <strong>Assigned To:</strong> {ticket.assigned_officer}
-                </p>
-                <p>
-                  <strong>Ward:</strong> {ticket.ward}
-                </p>
-                <p>
-                  <strong>Status:</strong> {ticket.status}
-                </p>
-              </section>
-            )}
-            {auth.user.role === "mayor" ? (
-              <MayorDashboard data={dashboardData} statusData={statusData} departmentData={departmentData} />
-            ) : (
-              <RoleDashboard role={auth.user.role} data={dashboardData} onStatusUpdate={updateTicketStatus} />
-            )}
-          </div>
-        </main>
+            <div className="stack">
+              <ResolutionTimeline currentStep={timelineIndex} />
+              {ticket && (
+                <section className="card">
+                  <h3>Live Ticket Snapshot</h3>
+                  <p>
+                    <strong>Ticket ID:</strong> {ticket.ticket_id}
+                  </p>
+                  <p>
+                    <strong>Assigned To:</strong> {ticket.assigned_officer}
+                  </p>
+                  <p>
+                    <strong>Ward:</strong> {ticket.ward}
+                  </p>
+                  <p>
+                    <strong>Status:</strong> {ticket.status}
+                  </p>
+                </section>
+              )}
+              <RoleDashboard
+                role={role}
+                data={dashboardData}
+                onStatusUpdate={updateTicketStatus}
+                authToken={auth.token}
+              />
+            </div>
+          </main>
+        )
       ) : (
         <main className="layout-grid">
           <AuthPanel onAuthenticated={handleAuthenticated} />

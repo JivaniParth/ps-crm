@@ -39,13 +39,18 @@ API runs on `http://localhost:5000` and frontend on `http://localhost:5173` by d
 ## Core Features Implemented
 
 - Dual-theme UI (Dark/Light) with WCAG-aware accent usage
-- Authentication with role-based access (`citizen`, `officer`, `admin`)
+- Authentication with role-based access (`citizen`, `officer`, `admin`, `mayor`)
 - Live NLP complaint classifier demo
 - Animated vertical resolution timeline
 - Recharts-based analytics dashboard
 - Ticket generation (`IM-YYYY-XXXXX`)
 - Geo-routing to nearest ward/field officer
 - Real-time status updates via polling endpoints
+- **Admin Manager Dashboard** with interactive CRUD:
+  - Officer Manager: Add/edit/delete officers, assign to departments
+  - Department Manager: Create/manage service departments
+  - Citizen Manager: View and manage registered citizens
+- Mayor Analytics Dashboard: City-wide complaint analytics by type and status
 - Architecture-ready hooks for mobile app, voice/IVR, and SMS intake
 
 ## Data Layer
@@ -63,4 +68,5 @@ API runs on `http://localhost:5000` and frontend on `http://localhost:5173` by d
 
 - Officer: `officer.ward12@pscrm.gov` / value from `OFFICER_BOOTSTRAP_PASSWORD`
 - Admin: `admin@pscrm.gov` / value from `ADMIN_BOOTSTRAP_PASSWORD`
+- Mayor: `mayor@pscrm.gov` / value from `MAYOR_BOOTSTRAP_PASSWORD`
 - Citizen: Use the in-app sign-up flow to create an account

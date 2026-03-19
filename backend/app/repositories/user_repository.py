@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import os
 from secrets import token_hex
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from threading import Lock
 
 CITIZEN = "citizen"
@@ -33,6 +33,7 @@ class User:
     display_name: str
     mobile: str = ""
     ward: str = ""
+    departments: list[str] = field(default_factory=list)
 
     def to_public_dict(self) -> dict[str, str]:
         return {
@@ -41,6 +42,7 @@ class User:
             "display_name": self.display_name,
             "mobile": self.mobile,
             "ward": self.ward,
+            "departments": self.departments,
         }
 
 
@@ -102,6 +104,45 @@ class InMemoryUserRepository:
         if not _verify_password(user.password_hash, password):
             return None
         return user
+
+    def list_by_role(self, role: str) -> list[User]:
+        with self._lock:
+            return [user for user in self._store.values() if user.role == role]
+
+    def update_officer(self, username: str, display_name: str = "", ward: str = "", departments: list[str] = None) -> User | None:
+        with self._lock:
+            user = self._store.get(username)
+            if user is None or user.role not in [OFFICER, MAYOR]:
+                return None
+            if display_name:
+                user.display_name = display_name
+            if ward:
+                user.ward = ward
+            if departments is not None:
+                user.departments = departments
+            return user
+
+    def create_officer(self, username: str, password: str, display_name: str, ward: str, role: str = OFFICER, departments: list[str] = None) -> User:
+        with self._lock:
+            if username in self._store:
+                raise ValueError("username already exists")
+            user = User(
+                username=username,
+                password_hash=_hash_password(password),
+                role=role,
+                display_name=display_name,
+                ward=ward,
+                departments=departments or [],
+            )
+            self._store[username] = user
+            return user
+
+    def delete_user(self, username: str) -> bool:
+        with self._lock:
+            if username in self._store and self._store[username].role in [OFFICER, MAYOR]:
+                del self._store[username]
+                return True
+            return False
 
 
 user_repo = InMemoryUserRepository()
