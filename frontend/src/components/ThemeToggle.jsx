@@ -4,7 +4,7 @@ function ThemeToggle({ isDark, onToggle }) {
   return (
     <button className="theme-toggle" onClick={onToggle} aria-label="Toggle color mode">
       <span className="toggle-dot" />
-      <span>{isDark ? "Digital Democracy / Dark" : "Clean Governance / Light"}</span>
+      <span>{isDark ? "Dark" : "Light"}</span>
     </button>
   );
 }

@@ -10,6 +10,7 @@ __pycache__/
 backend/.pytest_cache/
 backend/.mypy_cache/
 backend/.coverage
+backend/*.db
 
 # OS / editor
 .DS_Store

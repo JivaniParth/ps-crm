@@ -36,6 +36,22 @@ pip install -r requirements-ml.txt
 
 API runs on `http://localhost:5000` and frontend on `http://localhost:5173` by default.
 
+### 3) Data Persistence (Configured)
+
+Backend is now configured to use persistent SQL storage by default.
+
+- Default DB URL: `sqlite:///pscrm.db` (file created in `backend/`)
+- To switch to MySQL: set `MYSQL_URL` (for example `mysql+pymysql://user:password@localhost:3306/pscrm`)
+- To force old ephemeral mode: set `USE_IN_MEMORY_REPO=true`
+
+Windows PowerShell example:
+
+```powershell
+$env:MYSQL_URL = "sqlite:///pscrm.db"
+$env:USE_IN_MEMORY_REPO = "false"
+python run.py
+```
+
 ## Core Features Implemented
 
 - Dual-theme UI (Dark/Light) with WCAG-aware accent usage
@@ -55,9 +71,10 @@ API runs on `http://localhost:5000` and frontend on `http://localhost:5173` by d
 
 ## Data Layer
 
-- Structured complaints: SQLAlchemy model intended for MySQL deployments
-- Flexible media metadata + logs: MongoDB repository abstraction
-- Dev mode uses in-memory repositories for fast startup
+- Structured entities (complaints, users, departments, logs): SQLAlchemy-backed repositories
+- Default runtime uses persistent SQL file storage (`sqlite:///pscrm.db`)
+- Optional MySQL support via `MYSQL_URL`
+- Optional ephemeral mode via `USE_IN_MEMORY_REPO=true`
 
 ## AI Stack
 

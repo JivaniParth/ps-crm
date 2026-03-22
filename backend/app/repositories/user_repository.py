@@ -7,6 +7,13 @@ from secrets import token_hex
 from dataclasses import dataclass, field
 from threading import Lock
 
+from app.config import Config
+from app.repositories.sql_repository import (
+    deserialize_departments,
+    get_sql_store,
+    serialize_departments,
+)
+
 CITIZEN = "citizen"
 OFFICER = "officer"
 ADMIN = "admin"
@@ -145,4 +152,157 @@ class InMemoryUserRepository:
             return False
 
 
-user_repo = InMemoryUserRepository()
+class SQLUserRepository:
+    def __init__(self, db_url: str) -> None:
+        self._store = get_sql_store(db_url)
+        self._seed_default_users()
+
+    def _seed_default_users(self) -> None:
+        defaults = [
+            {
+                "username": "admin@pscrm.gov",
+                "password": os.getenv("ADMIN_BOOTSTRAP_PASSWORD", "change-admin-password"),
+                "role": ADMIN,
+                "display_name": "National Admin",
+                "mobile": "",
+                "ward": "",
+                "departments": [],
+            },
+            {
+                "username": "mayor@pscrm.gov",
+                "password": os.getenv("MAYOR_BOOTSTRAP_PASSWORD", "change-mayor-password"),
+                "role": MAYOR,
+                "display_name": "City Mayor",
+                "mobile": "",
+                "ward": "",
+                "departments": [],
+            },
+            {
+                "username": "officer.ward12@pscrm.gov",
+                "password": os.getenv("OFFICER_BOOTSTRAP_PASSWORD", "change-officer-password"),
+                "role": OFFICER,
+                "display_name": "R. Sharma",
+                "mobile": "",
+                "ward": "Ward-12",
+                "departments": [],
+            },
+            {
+                "username": "officer.ward19@pscrm.gov",
+                "password": os.getenv("OFFICER_BOOTSTRAP_PASSWORD", "change-officer-password"),
+                "role": OFFICER,
+                "display_name": "A. Iyer",
+                "mobile": "",
+                "ward": "Ward-19",
+                "departments": [],
+            },
+        ]
+
+        for item in defaults:
+            if self._store.get_user(item["username"]) is None:
+                self._store.upsert_user(
+                    {
+                        "username": item["username"],
+                        "password_hash": _hash_password(item["password"]),
+                        "role": item["role"],
+                        "display_name": item["display_name"],
+                        "mobile": item["mobile"],
+                        "ward": item["ward"],
+                        "departments_json": serialize_departments(item["departments"]),
+                    }
+                )
+
+    def _to_user(self, row) -> User:
+        return User(
+            username=row.username,
+            password_hash=row.password_hash,
+            role=row.role,
+            display_name=row.display_name,
+            mobile=row.mobile or "",
+            ward=row.ward or "",
+            departments=deserialize_departments(row.departments_json or "[]"),
+        )
+
+    def create_citizen(self, username: str, password: str, display_name: str, mobile: str) -> User:
+        if self._store.get_user(username) is not None:
+            raise ValueError("username already exists")
+
+        self._store.upsert_user(
+            {
+                "username": username,
+                "password_hash": _hash_password(password),
+                "role": CITIZEN,
+                "display_name": display_name,
+                "mobile": mobile,
+                "ward": "",
+                "departments_json": "[]",
+            }
+        )
+        row = self._store.get_user(username)
+        return self._to_user(row)
+
+    def get(self, username: str) -> User | None:
+        row = self._store.get_user(username)
+        if row is None:
+            return None
+        return self._to_user(row)
+
+    def verify_password(self, username: str, password: str) -> User | None:
+        user = self.get(username)
+        if user is None:
+            return None
+        if not _verify_password(user.password_hash, password):
+            return None
+        return user
+
+    def list_by_role(self, role: str) -> list[User]:
+        return [self._to_user(row) for row in self._store.list_users_by_role(role)]
+
+    def update_officer(self, username: str, display_name: str = "", ward: str = "", departments: list[str] = None) -> User | None:
+        row = self._store.get_user(username)
+        if row is None or row.role not in [OFFICER, MAYOR]:
+            return None
+
+        next_departments = deserialize_departments(row.departments_json or "[]")
+        if departments is not None:
+            next_departments = departments
+
+        self._store.upsert_user(
+            {
+                "username": row.username,
+                "password_hash": row.password_hash,
+                "role": row.role,
+                "display_name": display_name or row.display_name,
+                "mobile": row.mobile,
+                "ward": ward or row.ward,
+                "departments_json": serialize_departments(next_departments),
+            }
+        )
+        updated = self._store.get_user(username)
+        return self._to_user(updated)
+
+    def create_officer(self, username: str, password: str, display_name: str, ward: str, role: str = OFFICER, departments: list[str] = None) -> User:
+        if self._store.get_user(username) is not None:
+            raise ValueError("username already exists")
+
+        self._store.upsert_user(
+            {
+                "username": username,
+                "password_hash": _hash_password(password),
+                "role": role,
+                "display_name": display_name,
+                "mobile": "",
+                "ward": ward,
+                "departments_json": serialize_departments(departments or []),
+            }
+        )
+        row = self._store.get_user(username)
+        return self._to_user(row)
+
+    def delete_user(self, username: str) -> bool:
+        return self._store.delete_user(username, roles=[OFFICER, MAYOR])
+
+
+if Config.USE_IN_MEMORY_REPO:
+    user_repo = InMemoryUserRepository()
+else:
+    user_repo = SQLUserRepository(Config.MYSQL_URL)

@@ -6,9 +6,9 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
     CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
 
-    MYSQL_URL = os.getenv("MYSQL_URL", "mysql+pymysql://user:password@localhost:3306/pscrm")
+    MYSQL_URL = os.getenv("MYSQL_URL", "sqlite:///pscrm.db")
     MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
     MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "pscrm")
 
-    # For local demos we keep an in-memory repository.
-    USE_IN_MEMORY_REPO = os.getenv("USE_IN_MEMORY_REPO", "true").lower() == "true"
+    # Default to persistent SQL storage. Set USE_IN_MEMORY_REPO=true for ephemeral demo mode.
+    USE_IN_MEMORY_REPO = os.getenv("USE_IN_MEMORY_REPO", "false").lower() == "true"

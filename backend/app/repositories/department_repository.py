@@ -4,6 +4,9 @@ from dataclasses import dataclass, field
 from threading import Lock
 from uuid import uuid4
 
+from app.config import Config
+from app.repositories.sql_repository import get_sql_store
+
 
 @dataclass
 class Department:
@@ -66,4 +69,51 @@ class InMemoryDepartmentRepository:
             return False
 
 
-department_repo = InMemoryDepartmentRepository()
+class SQLDepartmentRepository:
+    def __init__(self, db_url: str) -> None:
+        self._store = get_sql_store(db_url)
+        self._seed_default_departments()
+
+    def _seed_default_departments(self) -> None:
+        default_departments = [
+            ("Roads", "Road maintenance and repair"),
+            ("Water", "Water supply and drainage"),
+            ("Electricity", "Power supply and street lighting"),
+            ("Sanitation", "Waste management and cleanliness"),
+            ("General Grievance", "Other complaints and issues"),
+        ]
+        existing = {item.name for item in self._store.list_departments()}
+        for name, description in default_departments:
+            if name not in existing:
+                self._store.create_department(name, description)
+
+    def _to_model(self, row) -> Department:
+        return Department(id=row.id, name=row.name, description=row.description or "")
+
+    def list_all(self) -> list[Department]:
+        return [self._to_model(row) for row in self._store.list_departments()]
+
+    def get_by_name(self, name: str) -> Department | None:
+        row = self._store.get_department_by_name(name)
+        if row is None:
+            return None
+        return self._to_model(row)
+
+    def create(self, name: str, description: str = "") -> Department:
+        row = self._store.create_department(name, description)
+        return self._to_model(row)
+
+    def update(self, name: str, description: str = "") -> Department | None:
+        row = self._store.update_department(name, description)
+        if row is None:
+            return None
+        return self._to_model(row)
+
+    def delete(self, name: str) -> bool:
+        return self._store.delete_department(name)
+
+
+if Config.USE_IN_MEMORY_REPO:
+    department_repo = InMemoryDepartmentRepository()
+else:
+    department_repo = SQLDepartmentRepository(Config.MYSQL_URL)

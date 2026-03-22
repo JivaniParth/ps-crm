@@ -8,7 +8,7 @@ export function useTheme() {
     if (persisted === "dark" || persisted === "light") {
       return persisted;
     }
-    return globalThis.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    return "light";
   });
 
   useEffect(() => {

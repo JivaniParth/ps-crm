@@ -63,6 +63,14 @@ p {
   padding: 2rem 0 3rem;
 }
 
+.admin-app-shell {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
 .hero {
   display: flex;
   justify-content: space-between;
@@ -423,6 +431,155 @@ button.secondary {
   gap: 0.4rem;
 }
 
+.admin-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  background: var(--bg);
+}
+
+.admin-sidebar {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface) 72%, var(--blue) 28%),
+      color-mix(in srgb, var(--surface) 70%, var(--accent-strong) 30%) 65%,
+      color-mix(in srgb, var(--surface) 78%, var(--blue) 22%)
+    );
+  color: var(--text);
+  border-right: 1px solid color-mix(in srgb, var(--text) 16%, transparent);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.admin-brand {
+  padding: 2rem 1.4rem 1.2rem;
+}
+
+.admin-brand h3 {
+  color: var(--accent-strong);
+  font-size: 1.55rem;
+}
+
+.admin-brand p {
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+.admin-nav {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+}
+
+.admin-nav-item {
+  text-align: left;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  color: var(--text);
+  font-size: 1.03rem;
+  font-weight: 600;
+  padding: 0.9rem 1rem;
+}
+
+.admin-nav-item:hover {
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+}
+
+.admin-nav-item.active {
+  background: linear-gradient(120deg, var(--blue), var(--cyan));
+  color: #f8fafc;
+  border-color: transparent;
+}
+
+.admin-sidebar-footer {
+  margin-top: auto;
+  padding: 1.1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-user-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.admin-user-row strong {
+  display: block;
+  color: var(--text);
+}
+
+.admin-user-row p {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.admin-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(120deg, var(--cyan), var(--blue));
+  border: 1px solid color-mix(in srgb, var(--blue) 65%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.admin-footer-actions {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.admin-footer-actions .theme-toggle {
+  width: 100%;
+  justify-content: center;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+.admin-content {
+  padding: 1.3rem;
+  display: grid;
+}
+
+.admin-main-content {
+  margin-top: 0;
+}
+
+.admin-panel-stack {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+.admin-panel-header {
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  border-radius: 18px;
+  padding: 1rem;
+  box-shadow: var(--shadow);
+}
+
+.admin-panel-header p {
+  margin-top: 0.35rem;
+}
+
+.admin-kpi-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -578,7 +735,9 @@ button.danger {
   .charts-grid,
   .kpi-grid,
   .admin-managers-container,
-  .manager-tabs {
+  .manager-tabs,
+  .admin-kpi-grid,
+  .admin-overview-grid {
     grid-template-columns: 1fr;
   }
 
@@ -594,5 +753,13 @@ button.danger {
 
   .gps-row {
     grid-template-columns: 1fr;
+  }
+
+  .admin-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar {
+    min-height: auto;
   }
 }

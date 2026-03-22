@@ -210,6 +210,97 @@ function App() {
     []
   );
   const role = auth.user?.role || "";
+  const isAdminView = isAuthenticated && role === "admin";
+  let mainContent;
+
+  if (isAuthenticated && role === "admin") {
+    mainContent = (
+      <main className="layout-grid layout-single admin-main-content">
+        <RoleDashboard
+          role={role}
+          data={dashboardData}
+          onStatusUpdate={updateTicketStatus}
+          authToken={auth.token}
+          user={auth.user}
+          isDark={isDark}
+          onToggleTheme={toggleTheme}
+          onLogout={handleLogout}
+        />
+      </main>
+    );
+  } else if (isAuthenticated && role === "mayor") {
+    mainContent = (
+      <main className="layout-grid layout-single">
+        <MayorDashboard data={dashboardData} statusData={statusData} departmentData={departmentData} />
+      </main>
+    );
+  } else if (isAuthenticated) {
+    mainContent = (
+      <main className="layout-grid">
+        <div className="stack">
+          {role === "citizen" && <NLPDemo onPrediction={setPrediction} />}
+          {role === "citizen" && (
+            <ComplaintForm
+              predictedDepartment={prediction.department}
+              authToken={auth.token}
+              onSubmitted={(submission) => {
+                setTicket(submission);
+                setTimelineIndex(0);
+              }}
+            />
+          )}
+          {role === "officer" && (
+            <section className="card">
+              <h3>Officer Console</h3>
+              <p>Use the queue controls to move complaints through their lifecycle.</p>
+            </section>
+          )}
+        </div>
+
+        <div className="stack">
+          <ResolutionTimeline currentStep={timelineIndex} />
+          {ticket && (
+            <section className="card">
+              <h3>Live Ticket Snapshot</h3>
+              <p>
+                <strong>Ticket ID:</strong> {ticket.ticket_id}
+              </p>
+              <p>
+                <strong>Assigned To:</strong> {ticket.assigned_officer}
+              </p>
+              <p>
+                <strong>Ward:</strong> {ticket.ward}
+              </p>
+              <p>
+                <strong>Status:</strong> {ticket.status}
+              </p>
+            </section>
+          )}
+          <RoleDashboard
+            role={role}
+            data={dashboardData}
+            onStatusUpdate={updateTicketStatus}
+            authToken={auth.token}
+          />
+        </div>
+      </main>
+    );
+  } else {
+    mainContent = (
+      <main className="layout-grid">
+        <AuthPanel onAuthenticated={handleAuthenticated} />
+        <section className="card">
+          <h3>Access Roles</h3>
+          <ul className="simple-list">
+            <li>Citizen: Register and submit grievances, track your tickets.</li>
+            <li>Officer: Review ward queue and update status.</li>
+            <li>Admin: Manage officers, departments, and citizen grievance activity.</li>
+            <li>Mayor: Monitor city-wide analytics for all complaint types.</li>
+          </ul>
+        </section>
+      </main>
+    );
+  }
 
   if (!authReady) {
     return (
@@ -222,108 +313,33 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
-      <header className="hero">
-        <div>
-          <p className="kicker">National Public Grievance Grid</p>
-          <h1>Public Service CRM</h1>
-          <p>{tagline}</p>
-          {auth.user && <p className="helper-text">Logged in as {auth.user.display_name} ({auth.user.role})</p>}
-        </div>
-        <div className="hero-actions">
-          <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
-          {auth.user && (
-            <button type="button" className="secondary" onClick={handleLogout}>
-              Logout
-            </button>
-          )}
-        </div>
-      </header>
-
-      {isAuthenticated ? (
-        role === "admin" ? (
-          <main className="layout-grid layout-single">
-            <RoleDashboard
-              role={role}
-              data={dashboardData}
-              onStatusUpdate={updateTicketStatus}
-              authToken={auth.token}
-            />
-          </main>
-        ) : role === "mayor" ? (
-          <main className="layout-grid layout-single">
-            <MayorDashboard data={dashboardData} statusData={statusData} departmentData={departmentData} />
-          </main>
-        ) : (
-          <main className="layout-grid">
-            <div className="stack">
-              {role === "citizen" && <NLPDemo onPrediction={setPrediction} />}
-              {role === "citizen" && (
-                <ComplaintForm
-                  predictedDepartment={prediction.department}
-                  authToken={auth.token}
-                  onSubmitted={(submission) => {
-                    setTicket(submission);
-                    setTimelineIndex(0);
-                  }}
-                />
-              )}
-              {role === "officer" && (
-                <section className="card">
-                  <h3>Officer Console</h3>
-                  <p>Use the queue controls to move complaints through their lifecycle.</p>
-                </section>
-              )}
-            </div>
-
-            <div className="stack">
-              <ResolutionTimeline currentStep={timelineIndex} />
-              {ticket && (
-                <section className="card">
-                  <h3>Live Ticket Snapshot</h3>
-                  <p>
-                    <strong>Ticket ID:</strong> {ticket.ticket_id}
-                  </p>
-                  <p>
-                    <strong>Assigned To:</strong> {ticket.assigned_officer}
-                  </p>
-                  <p>
-                    <strong>Ward:</strong> {ticket.ward}
-                  </p>
-                  <p>
-                    <strong>Status:</strong> {ticket.status}
-                  </p>
-                </section>
-              )}
-              <RoleDashboard
-                role={role}
-                data={dashboardData}
-                onStatusUpdate={updateTicketStatus}
-                authToken={auth.token}
-              />
-            </div>
-          </main>
-        )
-      ) : (
-        <main className="layout-grid">
-          <AuthPanel onAuthenticated={handleAuthenticated} />
-          <section className="card">
-            <h3>Access Roles</h3>
-            <ul className="simple-list">
-              <li>Citizen: Register and submit grievances, track your tickets.</li>
-              <li>Officer: Review ward queue and update status.</li>
-              <li>Admin: Manage officers, departments, and citizen grievance activity.</li>
-              <li>Mayor: Monitor city-wide analytics for all complaint types.</li>
-            </ul>
-          </section>
-        </main>
+    <div className={`app-shell ${isAdminView ? "admin-app-shell" : ""}`}>
+      {!isAdminView && (
+        <header className="hero">
+          <div>
+            <p className="kicker">National Public Grievance Grid</p>
+            <h1>Public Service CRM</h1>
+            <p>{tagline}</p>
+            {auth.user && <p className="helper-text">Logged in as {auth.user.display_name} ({auth.user.role})</p>}
+          </div>
+          <div className="hero-actions">
+            <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+            {auth.user && (
+              <button type="button" className="secondary" onClick={handleLogout}>
+                Logout
+              </button>
+            )}
+          </div>
+        </header>
       )}
+
+      {mainContent}
 
       {auth.user && ["officer"].includes(auth.user.role) && (
         <AnalyticsDashboard statusData={statusData} departmentData={departmentData} />
       )}
 
-      {globalStatus && <p className="status-text global-status">{globalStatus}</p>}
+      {globalStatus && !isAdminView && <p className="status-text global-status">{globalStatus}</p>}
     </div>
   );
 }
