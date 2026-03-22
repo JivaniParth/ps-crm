@@ -231,7 +231,7 @@ function App() {
   } else if (isAuthenticated && role === "mayor") {
     mainContent = (
       <main className="layout-grid layout-single">
-        <MayorDashboard data={dashboardData} statusData={statusData} departmentData={departmentData} />
+        <MayorDashboard data={dashboardData} authToken={auth.token} />
       </main>
     );
   } else if (isAuthenticated) {
@@ -258,7 +258,7 @@ function App() {
         </div>
 
         <div className="stack">
-          <ResolutionTimeline currentStep={timelineIndex} />
+          <ResolutionTimeline currentStep={timelineIndex} ticket={ticket} />
           {ticket && (
             <section className="card">
               <h3>Live Ticket Snapshot</h3>

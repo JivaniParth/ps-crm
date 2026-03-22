@@ -404,11 +404,52 @@ button.secondary {
   color: var(--green);
 }
 
+/* ─────────────────────────────────────────────────────────
+ * Governance Tier Badges
+ * ───────────────────────────────────────────────────────── */
+.badge.tier-local {
+  background: color-mix(in srgb, var(--green) 20%, transparent);
+  border-color: color-mix(in srgb, var(--green) 50%, transparent);
+  color: var(--green);
+}
+
+.badge.tier-state {
+  background: color-mix(in srgb, var(--blue) 20%, transparent);
+  border-color: color-mix(in srgb, var(--blue) 50%, transparent);
+  color: var(--blue);
+}
+
+.badge.tier-central {
+  background: color-mix(in srgb, #9333ea 20%, transparent);
+  border-color: color-mix(in srgb, #9333ea 50%, transparent);
+  color: #a855f7;
+}
+
 .empty-state {
   color: var(--text-muted);
   font-style: italic;
   padding: 1rem;
   text-align: center;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, #ef4444 80%, transparent);
+  }
+
+  70% {
+    box-shadow: 0 0 0 15px color-mix(in srgb, #ef4444 0%, transparent);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, #ef4444 0%, transparent);
+  }
+}
+
+.recharts-default-tooltip {
+  background-color: var(--surface) !important;
+  border-color: var(--accent) !important;
+  color: var(--text) !important;
 }
 
 .kpi-card {
@@ -440,12 +481,10 @@ button.secondary {
 
 .admin-sidebar {
   background:
-    linear-gradient(
-      180deg,
+    linear-gradient(180deg,
       color-mix(in srgb, var(--surface) 72%, var(--blue) 28%),
       color-mix(in srgb, var(--surface) 70%, var(--accent-strong) 30%) 65%,
-      color-mix(in srgb, var(--surface) 78%, var(--blue) 22%)
-    );
+      color-mix(in srgb, var(--surface) 78%, var(--blue) 22%));
   color: var(--text);
   border-right: 1px solid color-mix(in srgb, var(--text) 16%, transparent);
   display: flex;
@@ -724,6 +763,7 @@ button.danger {
     opacity: 0;
     transform: translateY(14px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -731,6 +771,7 @@ button.danger {
 }
 
 @media (max-width: 900px) {
+
   .layout-grid,
   .charts-grid,
   .kpi-grid,
@@ -762,4 +803,230 @@ button.danger {
   .admin-sidebar {
     min-height: auto;
   }
+}
+
+/* ─────────────────────────────────────────────────────────
+ * Resolution Journey Component
+ * ───────────────────────────────────────────────────────── */
+
+.resolution-journey {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.journey-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.nudge-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.nudge-btn.active {
+  background: linear-gradient(120deg, var(--blue), var(--cyan));
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
+  cursor: pointer;
+}
+
+.nudge-btn.active:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 212, 255, 0.4);
+}
+
+.nudge-btn.disabled {
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  color: var(--text-muted);
+  border: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.timeline-rich {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.timeline-item-rich {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 1.2rem;
+  position: relative;
+  padding-bottom: 2rem;
+}
+
+.timeline-item-rich:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.timeline-node {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid color-mix(in srgb, var(--text) 20%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  transition: all 0.3s ease;
+}
+
+.timeline-item-rich.done .timeline-node {
+  background: linear-gradient(140deg, var(--cyan), var(--green));
+  border-color: transparent;
+  color: #fff;
+}
+
+.timeline-item-rich.done .timeline-node svg {
+  width: 16px;
+  height: 16px;
+}
+
+.timeline-item-rich.active .timeline-node {
+  border-color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 10%, transparent);
+}
+
+.pulse-dot {
+  width: 12px;
+  height: 12px;
+  background: var(--blue);
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(0, 87, 255, 0.4);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(0, 87, 255, 0.7);
+  }
+
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(0, 87, 255, 0);
+  }
+
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(0, 87, 255, 0);
+  }
+}
+
+.timeline-connector {
+  width: 2px;
+  flex: 1;
+  background: color-mix(in srgb, var(--text) 15%, transparent);
+  margin-top: 4px;
+}
+
+.timeline-item-rich.done .timeline-connector {
+  background: var(--cyan);
+}
+
+.timeline-content {
+  padding-top: 4px;
+}
+
+.step-title {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  transition: color 0.3s ease;
+}
+
+.timeline-item-rich.done .step-title,
+.timeline-item-rich.active .step-title {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.step-completed-text,
+.step-pending-text {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  display: block;
+  margin-top: 0.2rem;
+}
+
+.step-microcopy {
+  margin-top: 0.8rem;
+  background: color-mix(in srgb, var(--blue) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--blue) 15%, transparent);
+  border-radius: 12px;
+  padding: 1rem;
+  animation: rise-in 0.4s ease;
+}
+
+.detail-text {
+  font-size: 0.95rem;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.officer-card {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed color-mix(in srgb, var(--text) 15%, transparent);
+}
+
+.officer-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(120deg, var(--cyan), var(--blue));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.officer-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.officer-role {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.officer-name {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 1.05rem;
+}
+
+.officer-contact {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
 }

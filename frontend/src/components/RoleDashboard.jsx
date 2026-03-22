@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import AdminManagerModal from "./AdminManagerModal";
+import { EscalateModal, OwnershipModal } from "./GridActionsModal";
 
 function RoleDashboard({
   role,
@@ -26,7 +27,11 @@ function RoleDashboard({
   }
 
   if (role === "officer") {
-    return <OfficerDashboard data={data} onStatusUpdate={onStatusUpdate} />;
+    return <OfficerDashboard data={data} onStatusUpdate={onStatusUpdate} authToken={authToken} onRefresh={() => {
+      // A quick hack to force a component re-render or status update fetch
+      // Usually we'd lift the fetch to App.jsx, but updating a dummy status triggers an actual refetch in App.jsx
+      onStatusUpdate("refresh", "refresh");
+    }} />;
   }
 
   return (
@@ -53,8 +58,15 @@ function CitizenDashboard({ data }) {
       <h4>Recent Complaints</h4>
       <ul className="simple-list">
         {data.recent.map((item) => (
-          <li key={item.ticket_id}>
-            <strong>{item.ticket_id}</strong> - {item.department} - {item.status}
+          <li key={item.ticket_id} className="admin-list-item" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {item.ticket_id}
+                {item.current_tier && <span className={`badge tier-${item.current_tier.toLowerCase()}`}>{item.current_tier}</span>}
+              </strong>
+              <p className="helper-text">{item.department}</p>
+            </div>
+            <span className="badge secondary">{item.status}</span>
           </li>
         ))}
       </ul>
@@ -62,7 +74,10 @@ function CitizenDashboard({ data }) {
   );
 }
 
-function OfficerDashboard({ data, onStatusUpdate }) {
+function OfficerDashboard({ data, onStatusUpdate, authToken, onRefresh }) {
+  const [activeEscalate, setActiveEscalate] = useState(null);
+  const [activeOwnership, setActiveOwnership] = useState(null);
+
   return (
     <section className="card">
       <h3>Officer Dashboard ({data.ward})</h3>
@@ -74,23 +89,43 @@ function OfficerDashboard({ data, onStatusUpdate }) {
       <h4>Action Queue</h4>
       <ul className="simple-list">
         {data.queue.map((item) => (
-          <li key={item.ticket_id}>
-            <div className="queue-row">
-              <span>
-                <strong>{item.ticket_id}</strong> - {item.department} - {item.status}
-              </span>
-              <div className="button-row">
-                <button type="button" className="secondary" onClick={() => onStatusUpdate(item.ticket_id, "In Progress")}>
-                  In Progress
-                </button>
-                <button type="button" onClick={() => onStatusUpdate(item.ticket_id, "Resolved")}>
-                  Resolve
-                </button>
+          <li key={item.ticket_id} className="admin-list-item" style={{ gap: '0.8rem' }}>
+            <div className="queue-row" style={{ alignItems: 'flex-start' }}>
+              <div>
+                <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {item.ticket_id}
+                  {item.current_tier && <span className={`badge tier-${item.current_tier.toLowerCase()}`}>{item.current_tier}</span>}
+                </strong>
+                <p className="helper-text">{item.department} &bull; {item.status}</p>
+              </div>
+              <div className="button-row" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <button type="button" className="secondary" style={{ fontSize: '0.75rem', padding: '0.3rem 0.5rem' }} onClick={() => setActiveEscalate(item.ticket_id)}>Escalate</button>
+                <button type="button" className="secondary" style={{ fontSize: '0.75rem', padding: '0.3rem 0.5rem' }} onClick={() => setActiveOwnership(item.ticket_id)}>Ownership</button>
+                {item.status !== "In Progress" && (
+                  <button type="button" className="secondary" style={{ fontSize: '0.75rem', padding: '0.3rem 0.5rem' }} onClick={() => onStatusUpdate(item.ticket_id, "In Progress")}>Progress</button>
+                )}
+                {item.status !== "Resolved" && (
+                  <button type="button" style={{ fontSize: '0.75rem', padding: '0.3rem 0.5rem' }} onClick={() => onStatusUpdate(item.ticket_id, "Resolved")}>Resolve</button>
+                )}
               </div>
             </div>
           </li>
         ))}
       </ul>
+
+      <EscalateModal
+        ticketId={activeEscalate || ""}
+        isOpen={!!activeEscalate}
+        onClose={() => setActiveEscalate(null)}
+        authToken={authToken}
+        onRefresh={onRefresh}
+      />
+      <OwnershipModal
+        ticketId={activeOwnership || ""}
+        isOpen={!!activeOwnership}
+        onClose={() => setActiveOwnership(null)}
+        authToken={authToken}
+      />
     </section>
   );
 }
@@ -104,7 +139,9 @@ function AdminWorkspace({ data, authToken, user, isDark, onToggleTheme, onLogout
       { id: "complaints", label: "Complaints" },
       { id: "departments", label: "Departments" },
       { id: "officers", label: "Officers" },
-      { id: "citizens", label: "Citizens" }
+      { id: "citizens", label: "Citizens" },
+      { id: "registry", label: "DB Registry" },
+      { id: "jurisdictions", label: "Jurisdictions" }
     ],
     []
   );
@@ -210,7 +247,25 @@ function renderAdminContent({
           <Kpi label="Citizens" value={data.summary.registered_citizens} />
         </div>
 
-        <div className="admin-overview-grid">
+        {data.tier_breakdown && Object.keys(data.tier_breakdown).length > 0 && (
+          <article className="card" style={{ marginTop: '1rem', borderTop: '4px solid var(--accent)' }}>
+            <h4 style={{ marginBottom: '1rem' }}>Governance Tier Analytics</h4>
+            <div className="kpi-grid admin-kpi-grid">
+              {Object.entries(data.tier_breakdown).map(([tier, stats]) => (
+                <article key={tier} className="kpi-card" style={{ borderLeft: '4px solid', borderLeftColor: tier === 'Local' ? 'var(--green)' : tier === 'State' ? 'var(--blue)' : '#a855f7' }}>
+                  <p className={`badge tier-${tier.toLowerCase()}`}>{tier} Tier</p>
+                  <h4 style={{ margin: '0.5rem 0' }}>{stats.total} Total</h4>
+                  <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    <span>{stats.open} Open</span>
+                    <span>{stats.resolved} Resolved</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </article>
+        )}
+
+        <div className="admin-overview-grid" style={{ marginTop: '1rem' }}>
           <article className="card">
             <h4>Highest Load</h4>
             <ul className="simple-list">
@@ -329,6 +384,30 @@ function renderAdminContent({
     );
   }
 
+  if (activeSection === "registry") {
+    return (
+      <ManagerPanel
+        title="Service Registry"
+        emptyMessage="Click Manage to view or add regional databases to the National Grid."
+        onManage={() => setActiveManager("registry")}
+        items={[]}
+        renderItem={() => null}
+      />
+    );
+  }
+
+  if (activeSection === "jurisdictions") {
+    return (
+      <ManagerPanel
+        title="Jurisdiction Layers"
+        emptyMessage="Click Manage to view spatial routing layers."
+        onManage={() => setActiveManager("jurisdictions")}
+        items={[]}
+        renderItem={() => null}
+      />
+    );
+  }
+
   return (
     <section className="card">
       <h4>Settings</h4>
@@ -380,7 +459,9 @@ OfficerDashboard.propTypes = {
     summary: PropTypes.object,
     queue: PropTypes.array
   }).isRequired,
-  onStatusUpdate: PropTypes.func.isRequired
+  onStatusUpdate: PropTypes.func.isRequired,
+  authToken: PropTypes.string,
+  onRefresh: PropTypes.func
 };
 
 AdminWorkspace.propTypes = {
@@ -403,8 +484,8 @@ AdminWorkspace.propTypes = {
 AdminWorkspace.defaultProps = {
   user: null,
   isDark: false,
-  onToggleTheme: () => {},
-  onLogout: () => {}
+  onToggleTheme: () => { },
+  onLogout: () => { }
 };
 
 ManagerPanel.propTypes = {
@@ -445,8 +526,8 @@ RoleDashboard.defaultProps = {
   data: null,
   user: null,
   isDark: false,
-  onToggleTheme: () => {},
-  onLogout: () => {}
+  onToggleTheme: () => { },
+  onLogout: () => { }
 };
 
 export default RoleDashboard;

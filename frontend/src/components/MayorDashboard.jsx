@@ -1,58 +1,119 @@
+import { useState } from "react";
 import PropTypes from "prop-types";
-import AnalyticsDashboard from "./AnalyticsDashboard";
+import AnalyticsCommandCenter from "./AnalyticsCommandCenter";
 
-function MayorDashboard({ data, statusData, departmentData }) {
-  if (!data) {
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+function MayorDashboard({ data, authToken }) {
+  const [drillDownData, setDrillDownData] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  if (!data || !data.analytics) {
     return (
       <section className="card">
-        <h3>Mayor Dashboard</h3>
-        <p>Loading city-wide analytics...</p>
+        <h3>Mayor's Analytics Command Center</h3>
+        <p>Loading city-wide telemetry...</p>
       </section>
     );
   }
 
+  const handleDrillDown = async (filters) => {
+    setLoading(true);
+    setDrillDownData({ filters, tickets: [] }); // Open modal immediately with loading state
+    try {
+      // Build query string e.g. ?ward=Ward-1&status=Open
+      const queryParams = new URLSearchParams(filters);
+      // For Mayor Drill-Downs typically we only want unresolved unless specified
+      if (!filters.status && !filters.department) queryParams.append("status", "Escalated");
+
+      const response = await fetch(`${API_BASE}/api/search?${queryParams.toString()}&limit=20`, {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        setDrillDownData({ filters, tickets: payload.results });
+      } else {
+        setDrillDownData(null);
+      }
+    } catch {
+      setDrillDownData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const closeDrillDown = () => setDrillDownData(null);
+
   return (
     <section className="stack mayor-stack">
-      <section className="card">
-        <h3>Mayor Dashboard</h3>
-        <p>City-wide analytics across all complaint types and service categories.</p>
-        <div className="kpi-grid">
-          <Kpi label="Total Complaints" value={data.summary.total_complaints} />
-          <Kpi label="Open" value={data.summary.open_complaints} />
-          <Kpi label="Resolved" value={data.summary.resolved_complaints} />
-          <Kpi label="Escalated" value={data.summary.escalated_complaints} />
+      <section className="card" style={{ paddingBottom: '0.5rem' }}>
+        <h3>Mayor's Analytics Command Center</h3>
+        <p>Real-time city-wide telemetry across all governance tiers.</p>
+        <div className="kpi-grid admin-kpi-grid" style={{ marginTop: '1.5rem' }}>
+          <Kpi label="Total Registered Tickets" value={data.summary.total_complaints} customColor="var(--text)" />
+          <Kpi label="Active Investigations" value={data.summary.open_complaints} customColor="var(--accent)" />
+          <Kpi label="Successfully Resolved" value={data.summary.resolved_complaints} customColor="var(--green)" />
+          <Kpi label="Critically Escalated" value={data.summary.escalated_complaints} customColor="orange" />
         </div>
       </section>
 
-      <AnalyticsDashboard statusData={statusData} departmentData={departmentData} title="Mayor Analytics" />
+      {/* Render the new Recharts Command Center */}
+      <AnalyticsCommandCenter analytics={data.analytics} onDrillDown={handleDrillDown} />
 
-      <section className="card">
-        <h4>Complaint Types by Volume</h4>
-        <ul className="simple-list">
-          {departmentData.length === 0 && <li>No complaints registered yet.</li>}
-          {departmentData.map((item) => (
-            <li key={item.name}>
-              {item.name} - {item.complaints}
-            </li>
-          ))}
-        </ul>
-      </section>
+      {/* Drill-Down Modal */}
+      {drillDownData && (
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && closeDrillDown()}>
+          <div className="modal-content" style={{ maxWidth: '600px', width: '100%' }}>
+            <div className="modal-header">
+              <h3>
+                Drill-Down Analysis
+                <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginLeft: '1rem' }}>
+                  {Object.entries(drillDownData.filters).map(([k, v]) => `${k}:${v}`).join(' | ')}
+                </span>
+              </h3>
+              <button type="button" className="modal-close" onClick={closeDrillDown}>✕</button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+              {loading && <p>Fetching live records...</p>}
+              {!loading && drillDownData.tickets.length === 0 && <p className="helper-text">No active records matched this query.</p>}
+              {!loading && drillDownData.tickets.length > 0 && (
+                <div className="manager-list">
+                  {drillDownData.tickets.map(ticket => (
+                    <div key={ticket.ticket_id} className="manager-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: '0.3rem' }}>
+                        <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          {ticket.ticket_id}
+                          <span className={`badge tier-${ticket.current_tier?.toLowerCase() || 'local'}`}>{ticket.current_tier || 'Local'}</span>
+                        </strong>
+                        <span className="badge secondary">{ticket.status}</span>
+                      </div>
+                      <p className="helper-text">{ticket.department} &bull; Ward: {ticket.ward}</p>
+                      <p style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>{ticket.description}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
 
-function Kpi({ label, value }) {
+function Kpi({ label, value, customColor }) {
   return (
-    <article className="kpi-card">
-      <p>{label}</p>
-      <h4>{value}</h4>
+    <article className="kpi-card" style={customColor ? { borderBottom: `4px solid ${customColor}` } : {}}>
+      <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>{label}</p>
+      <h4 style={{ color: customColor || "inherit", margin: "0.3rem 0" }}>{value}</h4>
     </article>
   );
 }
 
 Kpi.propTypes = {
   label: PropTypes.string.isRequired,
-  value: PropTypes.number.isRequired
+  value: PropTypes.number.isRequired,
+  customColor: PropTypes.string
 };
 
 MayorDashboard.propTypes = {
@@ -62,20 +123,10 @@ MayorDashboard.propTypes = {
       open_complaints: PropTypes.number.isRequired,
       resolved_complaints: PropTypes.number.isRequired,
       escalated_complaints: PropTypes.number.isRequired
-    }).isRequired
+    }),
+    analytics: PropTypes.object
   }),
-  statusData: PropTypes.arrayOf(
-    PropTypes.shape({
-      name: PropTypes.string.isRequired,
-      value: PropTypes.number.isRequired
-    })
-  ).isRequired,
-  departmentData: PropTypes.arrayOf(
-    PropTypes.shape({
-      name: PropTypes.string.isRequired,
-      complaints: PropTypes.number.isRequired
-    })
-  ).isRequired
+  authToken: PropTypes.string.isRequired
 };
 
 MayorDashboard.defaultProps = {

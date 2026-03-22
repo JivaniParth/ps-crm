@@ -12,3 +12,6 @@ class Config:
 
     # Default to persistent SQL storage. Set USE_IN_MEMORY_REPO=true for ephemeral demo mode.
     USE_IN_MEMORY_REPO = os.getenv("USE_IN_MEMORY_REPO", "false").lower() == "true"
+
+    # Service Registry config path (JSON array of RegionalEndpoint objects)
+    REGISTRY_CONFIG_PATH = os.getenv("REGISTRY_CONFIG_PATH", "")

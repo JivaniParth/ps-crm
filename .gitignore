@@ -12,6 +12,9 @@ backend/.mypy_cache/
 backend/.coverage
 backend/*.db
 
+# Docs
+docs/
+
 # OS / editor
 .DS_Store
 Thumbs.db
