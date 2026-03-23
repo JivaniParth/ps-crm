@@ -57,35 +57,6 @@ class InMemoryUserRepository:
     def __init__(self) -> None:
         self._store: dict[str, User] = {}
         self._lock = Lock()
-        self._seed_default_users()
-
-    def _seed_default_users(self) -> None:
-        self._store["admin@pscrm.gov"] = User(
-            username="admin@pscrm.gov",
-            password_hash=_hash_password(os.getenv("ADMIN_BOOTSTRAP_PASSWORD", "change-admin-password")),
-            role=ADMIN,
-            display_name="National Admin",
-        )
-        self._store["mayor@pscrm.gov"] = User(
-            username="mayor@pscrm.gov",
-            password_hash=_hash_password(os.getenv("MAYOR_BOOTSTRAP_PASSWORD", "change-mayor-password")),
-            role=MAYOR,
-            display_name="City Mayor",
-        )
-        self._store["officer.ward12@pscrm.gov"] = User(
-            username="officer.ward12@pscrm.gov",
-            password_hash=_hash_password(os.getenv("OFFICER_BOOTSTRAP_PASSWORD", "change-officer-password")),
-            role=OFFICER,
-            display_name="R. Sharma",
-            ward="Ward-12",
-        )
-        self._store["officer.ward19@pscrm.gov"] = User(
-            username="officer.ward19@pscrm.gov",
-            password_hash=_hash_password(os.getenv("OFFICER_BOOTSTRAP_PASSWORD", "change-officer-password")),
-            role=OFFICER,
-            display_name="A. Iyer",
-            ward="Ward-19",
-        )
 
     def create_citizen(self, username: str, password: str, display_name: str, mobile: str) -> User:
         with self._lock:
@@ -155,61 +126,6 @@ class InMemoryUserRepository:
 class SQLUserRepository:
     def __init__(self, db_url: str) -> None:
         self._store = get_sql_store(db_url)
-        self._seed_default_users()
-
-    def _seed_default_users(self) -> None:
-        defaults = [
-            {
-                "username": "admin@pscrm.gov",
-                "password": os.getenv("ADMIN_BOOTSTRAP_PASSWORD", "change-admin-password"),
-                "role": ADMIN,
-                "display_name": "National Admin",
-                "mobile": "",
-                "ward": "",
-                "departments": [],
-            },
-            {
-                "username": "mayor@pscrm.gov",
-                "password": os.getenv("MAYOR_BOOTSTRAP_PASSWORD", "change-mayor-password"),
-                "role": MAYOR,
-                "display_name": "City Mayor",
-                "mobile": "",
-                "ward": "",
-                "departments": [],
-            },
-            {
-                "username": "officer.ward12@pscrm.gov",
-                "password": os.getenv("OFFICER_BOOTSTRAP_PASSWORD", "change-officer-password"),
-                "role": OFFICER,
-                "display_name": "R. Sharma",
-                "mobile": "",
-                "ward": "Ward-12",
-                "departments": [],
-            },
-            {
-                "username": "officer.ward19@pscrm.gov",
-                "password": os.getenv("OFFICER_BOOTSTRAP_PASSWORD", "change-officer-password"),
-                "role": OFFICER,
-                "display_name": "A. Iyer",
-                "mobile": "",
-                "ward": "Ward-19",
-                "departments": [],
-            },
-        ]
-
-        for item in defaults:
-            if self._store.get_user(item["username"]) is None:
-                self._store.upsert_user(
-                    {
-                        "username": item["username"],
-                        "password_hash": _hash_password(item["password"]),
-                        "role": item["role"],
-                        "display_name": item["display_name"],
-                        "mobile": item["mobile"],
-                        "ward": item["ward"],
-                        "departments_json": serialize_departments(item["departments"]),
-                    }
-                )
 
     def _to_user(self, row) -> User:
         return User(

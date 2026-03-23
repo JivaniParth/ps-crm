@@ -26,18 +26,6 @@ class InMemoryDepartmentRepository:
     def __init__(self) -> None:
         self._store: dict[str, Department] = {}
         self._lock = Lock()
-        self._seed_default_departments()
-
-    def _seed_default_departments(self) -> None:
-        default_departments = [
-            ("Roads", "Road maintenance and repair"),
-            ("Water", "Water supply and drainage"),
-            ("Electricity", "Power supply and street lighting"),
-            ("Sanitation", "Waste management and cleanliness"),
-            ("General Grievance", "Other complaints and issues"),
-        ]
-        for name, description in default_departments:
-            self._store[name] = Department(id=str(uuid4()), name=name, description=description)
 
     def list_all(self) -> list[Department]:
         with self._lock:
@@ -72,20 +60,6 @@ class InMemoryDepartmentRepository:
 class SQLDepartmentRepository:
     def __init__(self, db_url: str) -> None:
         self._store = get_sql_store(db_url)
-        self._seed_default_departments()
-
-    def _seed_default_departments(self) -> None:
-        default_departments = [
-            ("Roads", "Road maintenance and repair"),
-            ("Water", "Water supply and drainage"),
-            ("Electricity", "Power supply and street lighting"),
-            ("Sanitation", "Waste management and cleanliness"),
-            ("General Grievance", "Other complaints and issues"),
-        ]
-        existing = {item.name for item in self._store.list_departments()}
-        for name, description in default_departments:
-            if name not in existing:
-                self._store.create_department(name, description)
 
     def _to_model(self, row) -> Department:
         return Department(id=row.id, name=row.name, description=row.description or "")
