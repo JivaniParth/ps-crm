@@ -1,3 +1,6 @@
+import os
+os.environ["USE_IN_MEMORY_REPO"] = "true"
+
 from app import create_app
 
 CITIZEN_TEST_SECRET = "CitizenTest!890"

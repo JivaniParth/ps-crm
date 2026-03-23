@@ -27,8 +27,9 @@ from app.repositories.department_repository import department_repo
 from app.repositories.audit_repository import audit_repo
 from app.repositories.global_index import global_index
 from app.repositories.jurisdiction_repo import jurisdiction_repo
+from app.repositories.audit_repository import audit_repo
 from app.services.analytics import build_analytics
-from app.services.auth_service import parse_bearer_token, sessions
+from app.services.auth_service import parse_bearer_token, sessions, login as auth_login
 from app.services.classifier import classifier
 from app.services.geo_router import route_by_location, route_by_location_v2
 from app.services.ticketing import generate_ticket_id
@@ -120,8 +121,11 @@ def login():
     payload = request.get_json(silent=True) or {}
     username = str(payload.get("username", "")).strip().lower()
     password = str(payload.get("password", ""))
+    region_key = payload.get("region_key")
+    if region_key:
+        region_key = str(region_key).strip().upper()
 
-    user = user_repo.verify_password(username, password)
+    user = auth_login(username, password, region_key=region_key or None)
     if user is None:
         return {"error": "invalid credentials"}, 401
 
@@ -187,8 +191,10 @@ def create_complaint():
     channel = str(payload.get("channel", "web")).strip() or "web"
 
     location = payload.get("location", {}) or {}
-    latitude = float(location.get("latitude", 0.0))
-    longitude = float(location.get("longitude", 0.0))
+    incident_latitude = float(location.get("incident_latitude", location.get("latitude", 0.0)))
+    incident_longitude = float(location.get("incident_longitude", location.get("longitude", 0.0)))
+    reporting_latitude = float(location.get("reporting_latitude", 0.0))
+    reporting_longitude = float(location.get("reporting_longitude", 0.0))
 
     if not description or not citizen_name or not mobile:
         return {"error": "citizen_name, mobile and description are required"}, 400
@@ -197,7 +203,7 @@ def create_complaint():
     class_result = classifier.classify(description)
 
     # V2 routing: get ward, officer, AND regional codes
-    route = route_by_location_v2(latitude, longitude)
+    route = route_by_location_v2(incident_latitude, incident_longitude)
 
     # Determine governance tier
     origin_tier = str(payload.get("origin_tier", route.get("tier", "Local")))
@@ -217,8 +223,10 @@ def create_complaint():
         description=description,
         department=class_result.department,
         channel=channel,
-        latitude=latitude,
-        longitude=longitude,
+        incident_latitude=incident_latitude,
+        incident_longitude=incident_longitude,
+        reporting_latitude=reporting_latitude,
+        reporting_longitude=reporting_longitude,
         ward=route["ward"],
         assigned_officer=route["assigned_officer"],
         origin_tier=origin_tier,
@@ -236,6 +244,7 @@ def create_complaint():
     # Update Global Index
     global_index.upsert(complaint.ticket_id, {
         "ticket_id": complaint.ticket_id,
+        "location": {"type": "Point", "coordinates": [incident_longitude, incident_latitude]},
         "origin_tier": complaint.origin_tier,
         "current_tier": complaint.current_tier,
         "state_code": complaint.state_code,
@@ -283,6 +292,27 @@ def update_status(ticket_id: str):
     return complaint.to_dict()
 
 
+@api_bp.get("/complaints/duplicates")
+def get_duplicates():
+    lat = request.args.get("lat")
+    lng = request.args.get("lng")
+    category = request.args.get("category")
+
+    if not lat or not lng:
+        return {"error": "lat and lng are required"}, 400
+
+    lat = float(lat)
+    lng = float(lng)
+
+    nearby = global_index.near(lng, lat, max_km=0.5)
+    duplicates = [
+        t for t in nearby
+        if t.get("status") == "Open" and (not category or t.get("category") == category)
+    ]
+    
+    return {"duplicates": duplicates}
+
+
 @api_bp.get("/complaints/<ticket_id>")
 def get_complaint(ticket_id: str):
     complaint = complaint_repo.get(ticket_id)
@@ -308,7 +338,17 @@ def get_timeline(ticket_id: str):
     if complaint is None:
         return {"error": TICKET_NOT_FOUND}, 404
 
-    steps = build_timeline(complaint.created_at)
+    audits = audit_repo.list_by_ticket(ticket_id)
+    steps = [
+        {
+            "from_tier": a.from_tier,
+            "to_tier": a.to_tier,
+            "reason": a.reason,
+            "timestamp": a.timestamp.isoformat() if a.timestamp else None,
+        }
+        for a in audits
+    ]
+    
     log_repo.append(ticket_id, f"Timeline viewed at {datetime.now(timezone.utc).isoformat()}")
     return {
         "ticket_id": ticket_id,
@@ -479,8 +519,15 @@ def mayor_dashboard():
     if error:
         return error
 
+    city_code = request.args.get("city_code", "DEV")
     complaints = complaint_repo.list_all()
     escalated_count = sum(1 for item in complaints if item.status == STATUS_ESCALATED)
+
+    from app.services.analytics import get_mayor_metrics
+    mayor_metrics = get_mayor_metrics(city_code)
+    
+    analytics_data = build_analytics(complaints)
+    analytics_data.update(mayor_metrics)
 
     return {
         "user": user.to_public_dict(),
@@ -490,7 +537,7 @@ def mayor_dashboard():
             "resolved_complaints": sum(1 for item in complaints if item.status == STATUS_RESOLVED),
             "escalated_complaints": escalated_count,
         },
-        "analytics": build_analytics(complaints),
+        "analytics": analytics_data,
     }
 
 

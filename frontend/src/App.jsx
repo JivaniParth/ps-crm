@@ -3,7 +3,6 @@ import AnalyticsDashboard from "./components/AnalyticsDashboard";
 import AuthPanel from "./components/AuthPanel";
 import ComplaintForm from "./components/ComplaintForm";
 import MayorDashboard from "./components/MayorDashboard";
-import NLPDemo from "./components/NLPDemo";
 import RoleDashboard from "./components/RoleDashboard";
 import ResolutionTimeline from "./components/ResolutionTimeline";
 import ThemeToggle from "./components/ThemeToggle";
@@ -14,7 +13,6 @@ const AUTH_KEY = "pscrm-auth";
 
 function App() {
   const { isDark, toggleTheme } = useTheme();
-  const [prediction, setPrediction] = useState({ department: "General Grievance", confidence: 0.4 });
   const [auth, setAuth] = useState({ token: "", user: null });
   const [authReady, setAuthReady] = useState(false);
   const [ticket, setTicket] = useState(null);
@@ -238,10 +236,8 @@ function App() {
     mainContent = (
       <main className="layout-grid">
         <div className="stack">
-          {role === "citizen" && <NLPDemo onPrediction={setPrediction} />}
           {role === "citizen" && (
             <ComplaintForm
-              predictedDepartment={prediction.department}
               authToken={auth.token}
               onSubmitted={(submission) => {
                 setTicket(submission);

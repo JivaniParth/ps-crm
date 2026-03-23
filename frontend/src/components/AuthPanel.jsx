@@ -10,7 +10,8 @@ function AuthPanel({ onAuthenticated }) {
     username: "",
     password: "",
     display_name: "",
-    mobile: ""
+    mobile: "",
+    region_key: ""
   });
 
   const update = (event) => {
@@ -24,7 +25,7 @@ function AuthPanel({ onAuthenticated }) {
 
     try {
       const endpoint = mode === "login" ? "/api/auth/login" : "/api/auth/register";
-      const payload =
+      let payload =
         mode === "login"
           ? { username: form.username, password: form.password }
           : {
@@ -33,6 +34,10 @@ function AuthPanel({ onAuthenticated }) {
               display_name: form.display_name,
               mobile: form.mobile
             };
+            
+      if (mode === "login" && form.region_key.trim()) {
+        payload.region_key = form.region_key.trim();
+      }
 
       const response = await fetch(`${API_BASE}${endpoint}`, {
         method: "POST",
@@ -79,6 +84,15 @@ function AuthPanel({ onAuthenticated }) {
           placeholder="Password"
           required
         />
+
+        {mode === "login" && (
+          <input
+            name="region_key"
+            value={form.region_key}
+            onChange={update}
+            placeholder="Region Key (Optional, e.g. MH-MUM)"
+          />
+        )}
 
         {mode === "register" && (
           <>

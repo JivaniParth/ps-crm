@@ -16,8 +16,10 @@ class Complaint:
     description: str
     department: str
     channel: str
-    latitude: float
-    longitude: float
+    incident_latitude: float
+    incident_longitude: float
+    reporting_latitude: float
+    reporting_longitude: float
     ward: str
     assigned_officer: str
 
@@ -62,8 +64,10 @@ class Complaint:
             "department": self.department,
             "channel": self.channel,
             "location": {
-                "latitude": self.latitude,
-                "longitude": self.longitude,
+                "incident_latitude": self.incident_latitude,
+                "incident_longitude": self.incident_longitude,
+                "reporting_latitude": self.reporting_latitude,
+                "reporting_longitude": self.reporting_longitude,
                 "state_code": self.state_code,
                 "city_code": self.city_code,
                 "ward": self.ward,

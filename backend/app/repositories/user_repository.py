@@ -57,6 +57,11 @@ class InMemoryUserRepository:
     def __init__(self) -> None:
         self._store: dict[str, User] = {}
         self._lock = Lock()
+        
+        # Seed test accounts for InMemory mode
+        self._store["admin@pscrm.gov"] = User("admin@pscrm.gov", _hash_password("change-admin-password"), ADMIN, "Sys Admin")
+        self._store["officer.ward12@pscrm.gov"] = User("officer.ward12@pscrm.gov", _hash_password("change-officer-password"), OFFICER, "Ward 12 Officer", ward="Ward-12", departments=["Roads"])
+        self._store["mayor@pscrm.gov"] = User("mayor@pscrm.gov", _hash_password("change-mayor-password"), MAYOR, "Mayor")
 
     def create_citizen(self, username: str, password: str, display_name: str, mobile: str) -> User:
         with self._lock:

@@ -61,18 +61,40 @@ class InMemoryGlobalIndex:
     def count(self, filters: dict) -> int:
         return len(self.search(filters, skip=0, limit=999999))
 
+    def near(self, lng: float, lat: float, max_km: float = 0.5) -> list[dict]:
+        from math import asin, cos, radians, sin, sqrt
+
+        def haversine(lat1, lon1, lat2, lon2):
+            dlat = radians(lat2 - lat1)
+            dlon = radians(lon2 - lon1)
+            a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+            return 2 * 6371 * asin(sqrt(a))
+            
+        results = []
+        for doc in self._store.values():
+            loc = doc.get("location", {})
+            coords = loc.get("coordinates", [])
+            if len(coords) == 2:
+                # GeoJSON order: [lng, lat]
+                clng, clat = coords[0], coords[1]
+                if haversine(lat, lng, clat, clng) <= max_km:
+                    results.append(doc)
+        return results
+
     def get(self, ticket_id: str) -> dict | None:
         return self._store.get(ticket_id)
 
-    def aggregate_by_tier(self) -> list[dict]:
-        """Ticket counts grouped by tier and status."""
-        buckets: dict[tuple[str, str], int] = {}
+    def aggregate_by_tier(self, city_code: str | None = None) -> list[dict]:
+        """Ticket counts grouped by tier, status, and category."""
+        buckets: dict[tuple[str, str, str], int] = {}
         for doc in self._store.values():
-            key = (doc.get("current_tier", ""), doc.get("status", ""))
+            if city_code and doc.get("city_code") != city_code:
+                continue
+            key = (doc.get("current_tier", ""), doc.get("status", ""), doc.get("category", ""))
             buckets[key] = buckets.get(key, 0) + 1
         return [
-            {"tier": tier, "status": status, "count": count}
-            for (tier, status), count in sorted(buckets.items())
+            {"tier": tier, "status": status, "category": category, "count": count}
+            for (tier, status, category), count in sorted(buckets.items())
         ]
 
     def search_by_text(self, query: str, limit: int = 50) -> list[dict]:
@@ -102,6 +124,7 @@ class MongoGlobalIndex:
         self._ensure_indexes(ASCENDING, GEOSPHERE)
 
     def _ensure_indexes(self, ASCENDING: Any, GEOSPHERE: Any) -> None:
+        self.col.create_index([("location", GEOSPHERE)])
         self.col.create_index([("state_code", ASCENDING), ("status", ASCENDING)])
         self.col.create_index(
             [("current_tier", ASCENDING), ("status", ASCENDING)]
@@ -138,23 +161,45 @@ class MongoGlobalIndex:
     def count(self, filters: dict) -> int:
         return self.col.count_documents(filters)
 
+    def near(self, lng: float, lat: float, max_km: float = 0.5) -> list[dict]:
+        return list(
+            self.col.find({
+                "location": {
+                    "$near": {
+                        "$geometry": {"type": "Point", "coordinates": [lng, lat]},
+                        "$maxDistance": max_km * 1000
+                    }
+                }
+            })
+        )
+
     def get(self, ticket_id: str) -> dict | None:
         return self.col.find_one({"_id": ticket_id})
 
-    def aggregate_by_tier(self) -> list[dict]:
-        return list(
-            self.col.aggregate(
-                [
-                    {
-                        "$group": {
-                            "_id": {"tier": "$current_tier", "status": "$status"},
-                            "count": {"$sum": 1},
-                        }
-                    },
-                    {"$sort": {"_id.tier": 1, "_id.status": 1}},
-                ]
-            )
-        )
+    def aggregate_by_tier(self, city_code: str | None = None) -> list[dict]:
+        pipeline = []
+        if city_code:
+            pipeline.append({"$match": {"city_code": city_code}})
+        
+        pipeline.extend([
+            {
+                "$group": {
+                    "_id": {"tier": "$current_tier", "status": "$status", "category": "$category"},
+                    "count": {"$sum": 1},
+                }
+            },
+            {"$sort": {"_id.tier": 1, "_id.status": 1, "_id.category": 1}},
+        ])
+        results = list(self.col.aggregate(pipeline))
+        return [
+            {
+                "tier": r["_id"].get("tier", ""),
+                "status": r["_id"].get("status", ""),
+                "category": r["_id"].get("category", ""),
+                "count": r.get("count", 0),
+            }
+            for r in results
+        ]
 
     def search_by_text(self, query: str, limit: int = 50) -> list[dict]:
         regex = {"$regex": query, "$options": "i"}

@@ -1,16 +1,11 @@
 import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 
-const TIMELINE_STEPS = [
-  { label: "Submitted", detail: "Your grievance has been securely logged in the system." },
-  { label: "AI Classified", detail: "Our AI model has accurately routed this to the correct department." },
-  { label: "Officer Assigned", detail: "An official is reviewing the location and requirements." },
-  { label: "Field Work Started", detail: "Awaiting spare parts from the central warehouse." },
-  { label: "Resolved", detail: "The issue has been resolved successfully." }
-];
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 function ResolutionTimeline({ currentStep = 0, ticket = null }) {
   const [nudgeStatus, setNudgeStatus] = useState({ canNudge: false, message: "Active after 24 hours of inactivity" });
+  const [timelineEvents, setTimelineEvents] = useState([]);
 
   useEffect(() => {
     if (!ticket) return;
@@ -26,7 +21,29 @@ function ResolutionTimeline({ currentStep = 0, ticket = null }) {
       setNudgeStatus({ canNudge: false, message: "Nudge available in " + Math.ceil(24 - hoursSinceUpdate) + " hours" });
     }
 
-    // For demo purposes, if it's not resolved, we could allow nudge testing, but we'll stick to the actual logic.
+    const fetchTimeline = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/complaints/${ticket.ticket_id}/timeline`);
+        if (res.ok) {
+          const data = await res.json();
+          const mapped = data.steps.map(step => ({
+            label: `Transferred: ${step.from_tier} → ${step.to_tier}`,
+            detail: step.reason,
+            timestamp: step.timestamp
+          }));
+
+          setTimelineEvents([
+            { label: "Submitted", detail: "Grievance logged securely.", timestamp: ticket.created_at },
+            ...mapped,
+            ...(ticket.status === "Resolved" ? [{ label: "Resolved", detail: "The issue has been resolved.", timestamp: ticket.resolved_at || ticket.updated_at }] : [])
+          ]);
+        }
+      } catch (err) {
+        console.error("Timeline fetch error:", err);
+      }
+    };
+    fetchTimeline();
+
   }, [ticket, currentStep]);
 
   const handleNudge = async () => {
@@ -53,10 +70,10 @@ function ResolutionTimeline({ currentStep = 0, ticket = null }) {
       </div>
 
       <div className="timeline-rich">
-        {TIMELINE_STEPS.map((step, index) => {
-          const isDone = index < currentStep;
-          const isActive = index === currentStep;
-          const isPending = index > currentStep;
+        {timelineEvents.map((step, index) => {
+          const isDone = index < timelineEvents.length - 1 || ticket.status === "Resolved";
+          const isActive = index === timelineEvents.length - 1 && ticket.status !== "Resolved";
+          const isPending = false;
 
           let statusClass = isDone ? "done" : isActive ? "active" : "pending";
 
@@ -70,19 +87,20 @@ function ResolutionTimeline({ currentStep = 0, ticket = null }) {
                     <div className="pulse-dot"></div>
                   ) : null}
                 </div>
-                {index < TIMELINE_STEPS.length - 1 && <div className="timeline-connector"></div>}
+                {index < timelineEvents.length - 1 && <div className="timeline-connector"></div>}
               </div>
 
               <div className="timeline-content">
                 <h4 className="step-title">{step.label}</h4>
 
                 {/* Micro-copy for the active step */}
-                {isActive && (
+                {(isActive || isDone) && (
                   <div className="step-microcopy">
                     <p className="detail-text">{step.detail}</p>
+                    {step.timestamp && <p className="detail-text" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{new Date(step.timestamp).toLocaleString()}</p>}
 
-                    {/* Show Officer Details if past the 'AI Classified' step (index >= 2) */}
-                    {index >= 2 && ticket && ticket.assigned_officer && (
+                    {/* Show Officer Details contextually */}
+                    {isActive && ticket && ticket.assigned_officer && (
                       <div className="officer-card">
                         <div className="officer-avatar">
                           {ticket.assigned_officer.charAt(0).toUpperCase()}

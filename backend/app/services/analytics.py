@@ -138,3 +138,39 @@ def build_analytics(complaints: list[Complaint]) -> dict:
         "anomalies": anomalies,
         "live_feed": live_feed_data
     }
+
+
+def get_mayor_metrics(city_code: str) -> dict:
+    from app.repositories.global_index import global_index
+    
+    raw_data = global_index.aggregate_by_tier(city_code)
+    
+    status_counts = {}
+    category_counts = {}
+    
+    for row in raw_data:
+        st = row.get("status", "")
+        cat = row.get("category", "")
+        c = row.get("count", 0)
+        
+        if st:
+            status_counts[st] = status_counts.get(st, 0) + c
+        if cat:
+            category_counts[cat] = category_counts.get(cat, 0) + c
+            
+    # Format for PieChart and BarChart
+    # Sorting to ensure consistent layout
+    status_breakdown = [
+        {"name": st, "value": count}
+        for st, count in sorted(status_counts.items(), key=lambda x: x[0])
+    ]
+    
+    category_breakdown = [
+        {"name": cat, "value": count}
+        for cat, count in sorted(category_counts.items(), key=lambda x: x[0])
+    ]
+    
+    return {
+        "status_breakdown": status_breakdown,
+        "category_breakdown": category_breakdown
+    }
